@@ -18,8 +18,9 @@ mongoose.connect(process.env.MONGO_URI)
   .catch(err => console.error('❌ MongoDB Connection Error:', err));
 
 // Routes
-app.use('/api/user', require('./routes/userRoutes'));  // User routes
-app.use('/api/task', require('./routes/taskRoutes'));  // Task routes
+app.use('/api/user', require('./routes/userRoutes'));   // User routes
+app.use('/api/task', require('./routes/taskRoutes'));   // Task routes
+app.use('/api/subtask', require('./routes/subTaskRoutes')); // Sub-task routes added
 
 // Test route
 app.get('/', (req, res) => {

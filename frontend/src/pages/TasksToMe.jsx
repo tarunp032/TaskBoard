@@ -6,36 +6,50 @@ const TasksToMe = () => {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState('all');
+  const [expandedUsers, setExpandedUsers] = useState({});
 
-  useEffect(() => {
-    fetchTasks();
-  }, []);
-
-  const fetchTasks = async () => {
+  // Fetch tasks, loader only if showLoader = true
+  const fetchTasks = async (showLoader = true) => {
+    if (showLoader) setLoading(true);
     try {
-      setLoading(true);
       const response = await api.get('/task/assigned-to-me');
       setTasks(response.data.data);
     } catch (error) {
       alert('Failed to fetch tasks: ' + error.message);
     } finally {
-      setLoading(false);
+      if (showLoader) setLoading(false);
     }
   };
+
+  // Only show loading on full reload
+  useEffect(() => {
+    fetchTasks(true);
+  }, []);
 
   const handleStatusToggle = async (taskId, currentStatus) => {
     const newStatus = currentStatus === 'pending' ? 'completed' : 'pending';
     try {
       await api.patch(`/task/${taskId}/status`, { status: newStatus });
       alert('Status updated!');
-      fetchTasks();
+      fetchTasks(false); // No screen-blink loader needed
     } catch (error) {
       alert('Failed to update status: ' + error.message);
     }
   };
 
-  const filteredTasks =
-    filterStatus === 'all' ? tasks : tasks.filter((t) => t.status === filterStatus);
+  // Group tasks by assignBy user
+  const groupedTasks = tasks.reduce((groups, task) => {
+    if (filterStatus !== 'all' && task.status !== filterStatus) return groups;
+    const userId = task.assignBy._id;
+    if (!groups[userId]) {
+      groups[userId] = {
+        user: task.assignBy,
+        tasks: []
+      };
+    }
+    groups[userId].tasks.push(task);
+    return groups;
+  }, {});
 
   if (loading)
     return (
@@ -50,7 +64,6 @@ const TasksToMe = () => {
         <h1 className="text-4xl font-extrabold mb-8 text-center tracking-wide">
           📥 Tasks <span className="text-blue-300">TO Me</span> (Inbox)
         </h1>
-
         {/* Filter Buttons */}
         <div className="flex flex-wrap justify-center gap-4 mb-8">
           {[
@@ -62,42 +75,65 @@ const TasksToMe = () => {
               key={filter.value}
               onClick={() => setFilterStatus(filter.value)}
               className={`px-5 py-2 rounded-full font-semibold border transition-all duration-300
-                ${
-                  filterStatus === filter.value
-                    ? `bg-${filter.color}-500 text-white border-${filter.color}-400 shadow-lg scale-105`
-                    : `bg-white/10 border-white/30 text-white/80 hover:bg-white/20`
+                ${filterStatus === filter.value
+                  ? `bg-${filter.color}-500 text-white border-${filter.color}-400 shadow-lg scale-105`
+                  : `bg-white/10 border-white/30 text-white/80 hover:bg-white/20`
                 }`}
             >
               {filter.label}
             </button>
           ))}
         </div>
-
-        {/* Tasks List */}
-        {filteredTasks.length === 0 ? (
+        {/* Grouped List */}
+        {Object.keys(groupedTasks).length === 0 ? (
           <div className="text-center text-white/80 text-lg py-8">
             No tasks found ✨
           </div>
         ) : (
-          <div className="space-y-6">
-            {filteredTasks.map((task) => (
-              <TaskCard
-                key={task._id}
-                task={task}
-                onStatusToggle={handleStatusToggle}
-                isInbox={true}
-              />
+          <div className="space-y-8">
+            {Object.values(groupedTasks).map((group) => (
+              <div key={group.user._id} className="bg-white/10 border border-white/20 rounded-xl p-6 shadow-xl">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="font-bold text-lg text-blue-100">
+                    {group.user.name}
+                  </span>
+                  <span className="font-semibold bg-gray-500/30 px-4 py-1 rounded-full text-white/90">
+                    {group.tasks.length} task{group.tasks.length > 1 ? 's' : ''}
+                  </span>
+                </div>
+                <button
+                  className="mt-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-2 rounded-lg font-semibold shadow-md hover:from-blue-600 hover:to-purple-700 transition-colors duration-300"
+                  onClick={() =>
+                    setExpandedUsers((prev) => ({
+                      ...prev,
+                      [group.user._id]: !prev[group.user._id]
+                    }))
+                  }
+                >
+                  {expandedUsers[group.user._id] ? 'Hide Tasks' : 'Show Tasks'}
+                </button>
+                {expandedUsers[group.user._id] && (
+                  <div className="space-y-4 mt-5">
+                    {group.tasks.map((task) => (
+                      <TaskCard
+                        key={task._id}
+                        task={task}
+                        onStatusToggle={handleStatusToggle}
+                        isInbox={true}
+                        onParentRefresh={fetchTasks}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         )}
-
         {/* Refresh Button */}
         <div className="mt-10 text-center">
           <button
-            onClick={fetchTasks}
-            className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-8 py-2.5 rounded-lg 
-                       font-semibold shadow-lg hover:from-indigo-600 hover:to-purple-700 transform hover:scale-105 
-                       transition-all duration-300"
+            onClick={() => fetchTasks(true)} // trigger loader
+            className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-8 py-2.5 rounded-lg font-semibold shadow-lg hover:from-indigo-600 hover:to-purple-700 transform hover:scale-105 transition-all duration-300"
           >
             🔄 Refresh Tasks
           </button>

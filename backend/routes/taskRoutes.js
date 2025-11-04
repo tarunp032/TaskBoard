@@ -11,7 +11,6 @@ const {
 } = require('../controllers/taskController');
 const authMiddleware = require('../middleware/authMiddleware');
 
-// All routes are protected (require authentication)
 
 // Create task
 router.post('/', authMiddleware, createTask);
