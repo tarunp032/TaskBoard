@@ -94,3 +94,63 @@ exports.getAllUsers = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+// FORGET PASSWORD - ask for email, respond with message, not password
+exports.forgetPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    // If user exists, "pretend" to send reset
+    const user = await User.findOne({ email });
+    if (!user) {
+      // Never reveal user existence!
+      return res.json({ success: true, message: 'If that email exists, reset instructions sent' });
+    }
+    // In real app: send email here!
+    res.json({ success: true, message: 'If that email exists, reset instructions sent' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// RESET PASSWORD (must be logged in)
+exports.resetPassword = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { oldPassword, newPassword } = req.body;
+    if (!oldPassword || !newPassword) {
+      return res.status(400).json({ message: 'Old and new password required.' });
+    }
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const isMatch = await bcrypt.compare(oldPassword, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Old password is incorrect' });
+    }
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+    res.json({ success: true, message: 'Password reset success' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// UPDATE USER PROFILE (name/email/update)
+exports.updateUser = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { name, email } = req.body;
+    const updateObj = {};
+    if (name) updateObj.name = name;
+    if (email) updateObj.email = email;
+    const user = await User.findByIdAndUpdate(userId, updateObj, { new: true, runValidators: true });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json({ success: true, message: 'Profile updated', data: { name: user.name, email: user.email } });
+  } catch (error) {
+    // duplicate email
+    if (error.code === 11000) {
+      return res.status(409).json({ message: 'Email already exists' });
+    }
+    res.status(500).json({ message: error.message });
+  }
+};

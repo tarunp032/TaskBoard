@@ -5,21 +5,24 @@ import api from "../utils/api";
 import { AuthContext } from "../context/AuthContext";
 import { Lock, Mail, LogIn } from "lucide-react";
 
+// --- ADD FORGOT PASSWORD STATE ---
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotMsg, setForgotMsg] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
   const navigate = useNavigate();
   const { login } = useContext(AuthContext);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-
     try {
       const response = await api.post("/user/login", { email, password });
       login(response.data.data, response.data.data.token);
-
       alert("Login successful!");
       navigate("/dashboard");
     } catch (err) {
@@ -83,6 +86,17 @@ const Login = () => {
               />
             </div>
           </div>
+          
+          {/* Forgot Password Link */}
+          <div className="text-right mt-2 mb-4">
+            <button
+              type="button"
+              onClick={() => setShowForgot(true)}
+              className="text-cyan-200 hover:text-white text-xs font-semibold underline"
+            >
+              Forgot password?
+            </button>
+          </div>
 
           {error && (
             <p className="text-red-300 text-sm text-center font-semibold">
@@ -112,6 +126,42 @@ const Login = () => {
           </Link>
         </p>
       </motion.div>
+
+      {/* Forgot Password Modal */}
+      {showForgot && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="relative bg-white/20 backdrop-blur-xl border border-white/30 shadow-2xl rounded-2xl p-8 w-96 text-white">
+            <button
+              className="absolute top-2 right-3 text-lg"
+              onClick={() => setShowForgot(false)}
+            >×</button>
+            <h2 className="text-xl font-bold mb-4 text-center">Forgot Password</h2>
+            <input
+              type="email"
+              className="w-full px-4 py-2 mb-3 rounded-lg bg-white/20 border border-white/20 text-white placeholder-gray-200"
+              value={forgotEmail}
+              placeholder="Enter your registered email"
+              onChange={e => setForgotEmail(e.target.value)}
+            />
+            <button
+              className="w-full py-2 bg-cyan-500 rounded-lg font-semibold"
+              disabled={forgotLoading}
+              onClick={async () => {
+                setForgotLoading(true);
+                setForgotMsg("");
+                try {
+                  await api.post("/user/forgot-password", { email: forgotEmail });
+                  setForgotMsg("If an account exists, reset instructions sent.");
+                } catch {
+                  setForgotMsg("Failed. Try again later.");
+                }
+                setForgotLoading(false);
+              }}
+            >{forgotLoading ? "Sending..." : "Request Reset"}</button>
+            {forgotMsg && <div className="mt-3 text-center text-sm text-teal-200">{forgotMsg}</div>}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

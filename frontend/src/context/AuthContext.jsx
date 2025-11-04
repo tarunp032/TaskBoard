@@ -11,18 +11,15 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const savedToken = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
-    
     if (savedToken && savedUser) {
       setToken(savedToken);
       setUser(JSON.parse(savedUser));
     }
-    
     setLoading(false);
   }, []);
 
   // Login function
   const login = (userData, userToken) => {
-    console.log('Login called:', userData, userToken);  
     setUser(userData);
     setToken(userToken);
     localStorage.setItem('token', userToken);
@@ -37,8 +34,17 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('user');
   };
 
+  // Update context & localStorage after profile edit
+  const updateProfile = (updates) => {
+    setUser((prev) => {
+      const updatedUser = { ...prev, ...updates };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      return updatedUser;
+    });
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, setUser, token, loading, login, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

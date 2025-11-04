@@ -43,7 +43,11 @@ const Header = () => {
 
         {/* User Info + Logout */}
         <div className="flex items-center gap-4">
-          <div className="hidden sm:flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full border border-white/20 text-gray-100 text-sm font-medium shadow-md">
+          <div
+            className="hidden sm:flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full border border-white/20 text-gray-100 text-sm font-medium shadow-md cursor-pointer"
+            onClick={() => navigate("/profile")}
+            title="Show profile"
+          >
             👋 <span className="truncate max-w-[120px]">{user?.name}</span>
           </div>
 

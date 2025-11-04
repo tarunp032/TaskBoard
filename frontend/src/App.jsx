@@ -6,6 +6,7 @@ import { AuthContext, AuthProvider } from './context/AuthContext';
 import Signup from './pages/Singup';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import ProfilePage from "./pages/ProfilePage";
 import TasksToMe from './pages/TasksToMe';
 import TasksByMe from './pages/TasksByMe';
 import Header from './components/Header';
@@ -22,6 +23,7 @@ const PrivateRoute = () => {
       <div className="min-h-screen bg-gray-50 pt-20">
         <Routes>
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/profile" element={<ProfilePage />} />
           <Route path="/tasks-to-me" element={<TasksToMe />} />
           <Route path="/tasks-by-me" element={<TasksByMe />} />
           <Route path="*" element={<Navigate to="/dashboard" />} />
