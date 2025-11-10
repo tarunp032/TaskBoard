@@ -5,7 +5,15 @@ import api from "../utils/api";
 import SubTaskList from "./SubTaskList";
 import SubTaskModal from "./SubTaskModal";
 
-const TaskCard = ({ task, onStatusToggle, onEdit, onDelete, isInbox, onParentRefresh }) => {
+const TaskCard = ({
+  task,
+  from, // <-- now "from" is passed in
+  onStatusToggle,
+  onEdit,
+  onDelete,
+  isInbox,
+  onParentRefresh,
+}) => {
   const overdue = isOverdue(task.deadline, task.status);
   const [subTasks, setSubTasks] = useState([]);
   const [showSubModal, setShowSubModal] = useState(false);
@@ -60,9 +68,12 @@ const TaskCard = ({ task, onStatusToggle, onEdit, onDelete, isInbox, onParentRef
           Created: {task.createdAt ? new Date(task.createdAt).toLocaleString() : "N/A"}
         </p>
         <div className="text-sm text-gray-600 mb-4 space-y-1">
-          <p>
-            <strong>From:</strong> {isInbox ? task.assignBy.name : task.assignTo.name}
-          </p>
+          {/* Show the real creator/assignee based on props */}
+          {from && (
+            <div>
+              <strong>From:</strong> {from}
+            </div>
+          )}
           <p>
             <strong>Deadline:</strong>{" "}
             <span className={overdue ? "text-red-600 font-medium" : "text-gray-700"}>

@@ -2,21 +2,20 @@ const jwt = require('jsonwebtoken');
 
 const authMiddleware = async (req, res, next) => {
   try {
-    // Get token from header
-    const token = req.headers.authorization?.split(' ')[1]; // "Bearer token123"
-    
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ message: 'Access denied. No token provided.' });
+    }
+
+    const token = authHeader.split(' ')[1]; // Expect "Bearer <token>"
     if (!token) {
       return res.status(401).json({ message: 'Access denied. No token provided.' });
     }
-    
-    // Verify token
-    const decoded = jwt.verify(token, "process.env.JWT_SECRET");
-    
-    // Attach user ID to request
-    req.user = { _id: decoded._id };
-    
-    next(); // Continue to controller
-    
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    req.user = { _id: decoded._id }; // Attach user id, you can extend payload here
+    next();
   } catch (error) {
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({ message: 'Token expired. Please login again.' });

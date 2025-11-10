@@ -1,16 +1,33 @@
 const express = require('express');
 const router = express.Router();
-const { signup, login, getAllUsers, forgetPassword, resetPassword, updateUser } = require('../controllers/userController');
+
+const {
+  signup,
+  login,
+  getAllUsers,
+  forgetPassword,
+  resetPassword,
+  updateUser,
+  verifyOtp,
+  resendOtp,
+  resetPasswordForgot
+} = require('../controllers/userController');
+
 const authMiddleware = require('../middleware/authMiddleware');
 
-// Public routes (no auth needed)
-router.post('/', signup);
-router.post('/login', login);
+// Public routes
+router.post('/', signup);               // Signup
+router.post('/login', login);           // Login
+router.post('/forgot-password', forgetPassword);  // Public
+router.post('/reset-password-forgot', resetPasswordForgot);  // Public
 
-// Protected route (auth needed)
-router.get('/', authMiddleware, getAllUsers);  // GET /api/user
-router.post('/forgot-password', forgetPassword); 
-router.post('/reset-password', authMiddleware, resetPassword); 
+// OTP verification and resend should be public (no auth required)
+router.post('/verify-otp', verifyOtp);
+router.post('/resend-otp', resendOtp);
+
+// Protected routes (require auth)
+router.get('/', authMiddleware, getAllUsers);    // Get all users
+router.post('/reset-password', authMiddleware, resetPassword);
 router.patch('/update-profile', authMiddleware, updateUser);
 
 module.exports = router;
