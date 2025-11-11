@@ -10,6 +10,7 @@ const SubTaskModal = ({ taskId, onClose, onSuccess }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
     if (!title.trim()) {
       setError("Subtask title is required");
       return;
@@ -21,12 +22,17 @@ const SubTaskModal = ({ taskId, onClose, onSuccess }) => {
 
     try {
       setLoading(true);
-      // ✅ Send both title & deadline to backend
+      // Endpoint (confirmed): POST /subtask/:taskId
       await api.post(`/subtask/${taskId}`, { title, deadline });
-      onSuccess(); // refresh parent task list
-      onClose();   // close modal after success
+      onSuccess();
+      onClose();
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to create subtask");
+      // Report backend error message, fallback generic if not present
+      setError(
+        err.response?.data?.message
+          ? `Server: ${err.response.data.message}`
+          : "Failed to create subtask. Please check server logs for details."
+      );
     } finally {
       setLoading(false);
     }
@@ -36,9 +42,7 @@ const SubTaskModal = ({ taskId, onClose, onSuccess }) => {
     <AnimatePresence>
       <motion.div
         className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       >
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
@@ -47,29 +51,22 @@ const SubTaskModal = ({ taskId, onClose, onSuccess }) => {
           transition={{ duration: 0.3 }}
           className="bg-white/10 border border-white/20 rounded-2xl p-6 text-white shadow-2xl w-[380px]"
         >
-          <h2 className="text-2xl font-bold mb-4 text-center text-blue-300">
-            Add Subtask
-          </h2>
-
+          <h2 className="text-2xl font-bold mb-4 text-center text-blue-300">Add Subtask</h2>
           {error && <p className="text-red-400 mb-3 text-center">{error}</p>}
-
           <form onSubmit={handleSubmit} className="space-y-4">
             <input
               type="text"
               placeholder="Enter subtask title"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={e => setTitle(e.target.value)}
               className="w-full px-4 py-2 rounded-xl bg-white/10 text-white placeholder-gray-400 border border-white/20 focus:ring-2 focus:ring-blue-500 outline-none"
             />
-
-            {/* ✅ New Deadline Input */}
             <input
               type="date"
               value={deadline}
-              onChange={(e) => setDeadline(e.target.value)}
+              onChange={e => setDeadline(e.target.value)}
               className="w-full px-4 py-2 rounded-xl bg-white/10 text-white placeholder-gray-400 border border-white/20 focus:ring-2 focus:ring-blue-500 outline-none"
             />
-
             <div className="flex gap-3">
               <motion.button
                 whileTap={{ scale: 0.95 }}

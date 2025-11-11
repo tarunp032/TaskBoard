@@ -1,336 +1,244 @@
 const Task = require('../models/taskModel');
+const User = require("../models/userModel");
+const sendEmail = require("../utils/sendEmail");
 
-// ==========================================
-// 1. Create Task - Self-assignment block
-// ==========================================
+// Create Task
 exports.createTask = async (req, res) => {
   try {
     const { taskname, assignTo, deadline } = req.body;
     const assignBy = req.user._id;
-    
-    // Validation
+
     if (!taskname || !assignTo || !deadline) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'Please provide taskname, assignTo, and deadline' 
-      });
+      return res.status(400).json({ success: false, message: "Please provide taskname, assignTo, and deadline" });
     }
-    
-    // Self-assignment check
     if (assignBy.toString() === assignTo) {
-      return res.status(403).json({ 
-        success: false,
-        message: 'Cannot assign task to yourself' 
-      });
+      return res.status(403).json({ success: false, message: "Cannot assign task to yourself" });
     }
-    
-    // Create task
+
     const task = await Task.create({
       taskname,
       assignBy,
       assignTo,
       deadline,
-      status: 'pending'
+      status: "pending",
     });
-    
-    // Populate assignTo and assignBy details
-    await task.populate([
-      { path: 'assignTo', select: 'name email' },
-      { path: 'assignBy', select: 'name email' }
-    ]);
-    
-    res.status(201).json({
-      success: true,
-      message: 'Task created successfully',
-      data: task
+    await task.populate("assignTo", "name email");
+    await task.populate("assignBy", "name email");
+
+    await sendEmail({
+      to: task.assignTo.email,
+      subject: `New Task Assigned: ${task.taskname}`,
+      text: `Hello ${task.assignTo.name},\n\nYou have been assigned a new task by ${task.assignBy.name}.\n\nTask: ${task.taskname}\nDeadline: ${deadline}\n\nPlease check your dashboard for details.`,
     });
+
+    res.status(201).json({ success: true, message: "Task created successfully", data: task });
   } catch (error) {
-    console.error('Create task error:', error);
-    res.status(500).json({ 
-      success: false,
-      message: error.message 
-    });
+    console.error("Create task error", error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// ==========================================
-// 2. Get Tasks Assigned TO Me
-// ==========================================
+// Get Tasks TO Me
 exports.getTasksToMe = async (req, res) => {
   try {
     const { startDate, endDate, status } = req.query;
     const userId = req.user._id;
-    
-    // Build filter
     const filter = { assignTo: userId };
-    
-    // Date range filter
+
+    // Date validation
+    if (startDate && isNaN(new Date(startDate))) {
+      return res.status(400).json({ success: false, message: "Invalid startDate" });
+    }
+    if (endDate && isNaN(new Date(endDate))) {
+      return res.status(400).json({ success: false, message: "Invalid endDate" });
+    }
+
     if (startDate || endDate) {
       filter.deadline = {};
       if (startDate) filter.deadline.$gte = new Date(startDate);
       if (endDate) filter.deadline.$lte = new Date(endDate);
     }
-    
-    // Status filter
-    if (status) filter.status = status;
-    
-    // Fetch tasks
+
+    if (status && ['pending', 'completed'].includes(status)) {
+      filter.status = status;
+    }
+
     const tasks = await Task.find(filter)
       .populate('assignBy', 'name email')
       .populate('assignTo', 'name email')
-      .sort({ deadline: 1 }); // Ascending order
-    
-    res.json({
-      success: true,
-      count: tasks.length,
-      data: tasks
-    });
+      .sort({ deadline: 1 });
+
+    res.json({ success: true, count: tasks.length, data: tasks });
   } catch (error) {
     console.error('Get tasks to me error:', error);
-    res.status(500).json({ 
-      success: false,
-      message: error.message 
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// ==========================================
-// 3. Get Tasks Assigned BY Me
-// ==========================================
+// Get Tasks BY Me
 exports.getTasksByMe = async (req, res) => {
   try {
     const { startDate, endDate, status } = req.query;
     const userId = req.user._id;
-    
-    // Build filter
     const filter = { assignBy: userId };
-    
-    // Date range filter
+
+    if (startDate && isNaN(new Date(startDate))) {
+      return res.status(400).json({ success: false, message: "Invalid startDate" });
+    }
+    if (endDate && isNaN(new Date(endDate))) {
+      return res.status(400).json({ success: false, message: "Invalid endDate" });
+    }
+
     if (startDate || endDate) {
       filter.deadline = {};
       if (startDate) filter.deadline.$gte = new Date(startDate);
       if (endDate) filter.deadline.$lte = new Date(endDate);
     }
-    
-    // Status filter
-    if (status) filter.status = status;
-    
-    // Fetch tasks
+
+    if (status && ['pending', 'completed'].includes(status)) {
+      filter.status = status;
+    }
+
     const tasks = await Task.find(filter)
       .populate('assignTo', 'name email')
       .populate('assignBy', 'name email')
       .sort({ deadline: 1 });
-    
-    res.json({
-      success: true,
-      count: tasks.length,
-      data: tasks
-    });
+
+    res.json({ success: true, count: tasks.length, data: tasks });
   } catch (error) {
     console.error('Get tasks by me error:', error);
-    res.status(500).json({ 
-      success: false,
-      message: error.message 
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// ==========================================
-// 4. Update Task Status (Toggle pending/completed)
-// ==========================================
+// Update Task Status
 exports.updateTaskStatus = async (req, res) => {
   try {
     const { taskId } = req.params;
     const { status } = req.body;
     const userId = req.user._id;
-    
-    // Validation
-    if (!status || !['pending', 'completed'].includes(status)) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'Status must be either "pending" or "completed"' 
-      });
+
+    if (!["pending", "completed"].includes(status)) {
+      return res.status(400).json({ success: false, message: "Status must be either pending or completed" });
     }
-    
-    // Find task
-    const task = await Task.findById(taskId);
-    
-    if (!task) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'Task not found' 
-      });
+
+    const task = await Task.findById(taskId).populate("assignTo", "name email").populate("assignBy", "name email");
+    if (!task) return res.status(404).json({ success: false, message: "Task not found" });
+
+    if (task.assignTo._id.toString() !== userId.toString()) {
+      return res.status(403).json({ success: false, message: "You can only update status of tasks assigned to you" });
     }
-    
-    // Authorization check - Only assignTo can update status
-    if (task.assignTo.toString() !== userId.toString()) {
-      return res.status(403).json({ 
-        success: false,
-        message: 'You can only update tasks assigned to you' 
-      });
-    }
-    
-    // Update status
+
     task.status = status;
     await task.save();
-    
-    // Populate for response
-    await task.populate([
-      { path: 'assignTo', select: 'name email' },
-      { path: 'assignBy', select: 'name email' }
-    ]);
-    
-    res.json({
-      success: true,
-      message: `Task marked as ${status}`,
-      data: task
+
+    // Populate again for response
+    await task.populate("assignTo", "name email");
+    await task.populate("assignBy", "name email");
+
+    await sendEmail({
+      to: task.assignTo.email,
+      subject: `Task Status Updated: ${task.taskname}`,
+      text: `Hello ${task.assignTo.name},\n\nThe status of your task "${task.taskname}" has been updated to "${status.toUpperCase()}".\n\nRegards,\nTaskBoard Team`,
     });
+
+    res.json({ success: true, message: `Task marked as ${status}`, data: task });
   } catch (error) {
-    console.error('Update task status error:', error);
-    res.status(500).json({ 
-      success: false,
-      message: error.message 
-    });
+    console.error("Update task status error", error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// ==========================================
-// 5. Update Task (Edit deadline/status)
-// ==========================================
+// Update Task (Edit)
 exports.updateTask = async (req, res) => {
   try {
     const { taskId } = req.params;
     const { taskname, deadline, status } = req.body;
     const userId = req.user._id;
-    
-    // Find task
-    const task = await Task.findById(taskId);
-    
-    if (!task) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'Task not found' 
-      });
+
+    const task = await Task.findById(taskId).populate("assignTo", "name email").populate("assignBy", "name email");
+    if (!task) return res.status(404).json({ success: false, message: "Task not found" });
+
+    if (task.assignBy._id.toString() !== userId.toString()) {
+      return res.status(403).json({ success: false, message: "You can only edit tasks you assigned" });
     }
-    
-    // Authorization check - Only assignBy can edit
-    if (task.assignBy.toString() !== userId.toString()) {
-      return res.status(403).json({ 
-        success: false,
-        message: 'You can only edit tasks you assigned' 
-      });
-    }
-    
-    // Update allowed fields only
+
     if (taskname) task.taskname = taskname;
-    if (deadline) task.deadline = deadline;
-    if (status && ['pending', 'completed'].includes(status)) {
-      task.status = status;
+    if (deadline) {
+      const parsedDeadline = new Date(deadline);
+      if (isNaN(parsedDeadline)) {
+        return res.status(400).json({ success: false, message: "Invalid deadline date" });
+      }
+      task.deadline = parsedDeadline;
     }
-    
+    if (status && ["pending", "completed"].includes(status)) task.status = status;
+
     await task.save();
-    
-    // Populate for response
-    await task.populate([
-      { path: 'assignTo', select: 'name email' },
-      { path: 'assignBy', select: 'name email' }
-    ]);
-    
-    res.json({
-      success: true,
-      message: 'Task updated successfully',
-      data: task
+
+    // Populate again for response
+    await task.populate("assignTo", "name email");
+    await task.populate("assignBy", "name email");
+
+    await sendEmail({
+      to: task.assignTo.email,
+      subject: `Task Updated: ${task.taskname}`,
+      text: `Hello ${task.assignTo.name},\n\nThe task assigned to you by ${task.assignBy.name} has been updated.\n\nDetails:\n- Task: ${task.taskname}\n- Deadline: ${task.deadline}\n- Status: ${task.status.toUpperCase()}\n\nPlease check your dashboard for the latest details.`,
     });
+
+    res.json({ success: true, message: "Task updated successfully", data: task });
   } catch (error) {
-    console.error('Update task error:', error);
-    res.status(500).json({ 
-      success: false,
-      message: error.message 
-    });
+    console.error("Update task error", error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// ==========================================
-// 6. Delete Task (Allow both assignBy AND assignTo)
-// ==========================================
+// Delete Task
 exports.deleteTask = async (req, res) => {
   try {
     const { taskId } = req.params;
     const userId = req.user._id;
-    
-    // Find task
+
     const task = await Task.findById(taskId);
-    
     if (!task) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'Task not found' 
-      });
+      return res.status(404).json({ success: false, message: "Task not found" });
     }
-    
-    // ✅ Authorization - Allow deletion if user is EITHER assignBy OR assignTo
+
     const isCreator = task.assignBy.toString() === userId.toString();
     const isAssignee = task.assignTo.toString() === userId.toString();
-    
+
     if (!isCreator && !isAssignee) {
-      return res.status(403).json({ 
-        success: false,
-        message: 'You can only delete tasks you created or are assigned to' 
-      });
+      return res.status(403).json({ success: false, message: "You can only delete tasks you created or are assigned to" });
     }
-    
-    // Delete task
+
     await Task.findByIdAndDelete(taskId);
-    
-    res.json({
-      success: true,
-      message: 'Task deleted successfully'
-    });
+
+    res.json({ success: true, message: "Task deleted successfully" });
   } catch (error) {
-    console.error('Delete task error:', error);
-    res.status(500).json({ 
-      success: false,
-      message: error.message 
-    });
+    console.error("Delete task error:", error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// ==========================================
-// 7. Get Dashboard Stats
-// ==========================================
+// Get Dashboard Stats
 exports.getDashboardStats = async (req, res) => {
   try {
     const userId = req.user._id;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
-    // Tasks TO Me counts
+
     const tasksToMeTotal = await Task.countDocuments({ assignTo: userId });
-    const tasksToMePending = await Task.countDocuments({ 
-      assignTo: userId, 
-      status: 'pending' 
-    });
-    const tasksToMeCompleted = await Task.countDocuments({ 
-      assignTo: userId, 
-      status: 'completed' 
-    });
+    const tasksToMePending = await Task.countDocuments({ assignTo: userId, status: "pending" });
+    const tasksToMeCompleted = await Task.countDocuments({ assignTo: userId, status: "completed" });
     const tasksToMeOverdue = await Task.countDocuments({
       assignTo: userId,
-      status: 'pending',
-      deadline: { $lt: today }
+      status: "pending",
+      deadline: { $lt: today },
     });
-    
-    // Tasks BY Me counts
+
     const tasksByMeTotal = await Task.countDocuments({ assignBy: userId });
-    const tasksByMePending = await Task.countDocuments({ 
-      assignBy: userId, 
-      status: 'pending' 
-    });
-    const tasksByMeCompleted = await Task.countDocuments({ 
-      assignBy: userId, 
-      status: 'completed' 
-    });
-    
+    const tasksByMePending = await Task.countDocuments({ assignBy: userId, status: "pending" });
+    const tasksByMeCompleted = await Task.countDocuments({ assignBy: userId, status: "completed" });
+
     res.json({
       success: true,
       data: {
@@ -338,20 +246,17 @@ exports.getDashboardStats = async (req, res) => {
           total: tasksToMeTotal,
           pending: tasksToMePending,
           completed: tasksToMeCompleted,
-          overdue: tasksToMeOverdue
+          overdue: tasksToMeOverdue,
         },
         tasksByMe: {
           total: tasksByMeTotal,
           pending: tasksByMePending,
-          completed: tasksByMeCompleted
+          completed: tasksByMeCompleted,
         }
       }
     });
   } catch (error) {
     console.error('Get dashboard stats error:', error);
-    res.status(500).json({ 
-      success: false,
-      message: error.message 
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };

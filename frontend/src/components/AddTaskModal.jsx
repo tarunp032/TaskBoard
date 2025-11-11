@@ -11,30 +11,27 @@ const AddTaskModal = ({ onClose, onSuccess }) => {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    const fetchUsers = async () => {
+      setLoadingUsers(true);
+      try {
+        const res = await api.get("/user");
+        setUsers(res.data.data || []);
+      } catch (err) {
+        setError("Failed to fetch users");
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
     fetchUsers();
   }, []);
-
-  const fetchUsers = async () => {
-    try {
-      setLoadingUsers(true);
-      const response = await api.get("/user");
-      setUsers(response.data.data || []);
-    } catch (err) {
-      setError("Failed to fetch users");
-    } finally {
-      setLoadingUsers(false);
-    }
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-
-    if (!taskname || !assignTo || !deadline) {
+    if (!taskname.trim() || !assignTo || !deadline) {
       setError("All fields are required");
       return;
     }
-
     try {
       await api.post("/task", { taskname, assignTo, deadline });
       alert("Task created successfully!");
@@ -62,7 +59,6 @@ const AddTaskModal = ({ onClose, onSuccess }) => {
           transition={{ duration: 0.4, ease: "easeOut" }}
           className="bg-white/10 backdrop-blur-2xl border border-white/20 shadow-2xl rounded-2xl p-8 w-[420px] relative text-white"
         >
-          {/* Header */}
           <h2 className="text-3xl font-bold mb-6 text-center bg-gradient-to-r from-pink-400 via-purple-300 to-blue-400 text-transparent bg-clip-text">
             Add New Task
           </h2>
@@ -73,9 +69,7 @@ const AddTaskModal = ({ onClose, onSuccess }) => {
             </p>
           )}
 
-          {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Task Name */}
             <div>
               <label className="block text-sm font-semibold mb-2 tracking-wide text-gray-200">
                 Task Name
@@ -86,10 +80,11 @@ const AddTaskModal = ({ onClose, onSuccess }) => {
                 onChange={(e) => setTaskname(e.target.value)}
                 placeholder="Enter task name"
                 className="w-full px-4 py-2.5 rounded-xl bg-white/10 text-white placeholder-gray-400 border border-white/20 focus:border-blue-400 focus:ring-2 focus:ring-blue-500 outline-none transition-all duration-300"
+                required
+                minLength={3}
               />
             </div>
 
-            {/* Assign To */}
             <div>
               <label className="block text-sm font-semibold mb-2 tracking-wide text-gray-200">
                 Assign To
@@ -101,6 +96,7 @@ const AddTaskModal = ({ onClose, onSuccess }) => {
                   value={assignTo}
                   onChange={(e) => setAssignTo(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl bg-white/10 text-white border border-white/20 focus:border-blue-400 focus:ring-2 focus:ring-blue-500 outline-none transition-all duration-300"
+                  required
                 >
                   <option value="">Select a user</option>
                   {users.map((user) => (
@@ -116,7 +112,6 @@ const AddTaskModal = ({ onClose, onSuccess }) => {
               )}
             </div>
 
-            {/* Deadline */}
             <div>
               <label className="block text-sm font-semibold mb-2 tracking-wide text-gray-200">
                 Deadline
@@ -126,10 +121,10 @@ const AddTaskModal = ({ onClose, onSuccess }) => {
                 value={deadline}
                 onChange={(e) => setDeadline(e.target.value)}
                 className="w-full px-4 py-2.5 rounded-xl bg-white/10 text-white border border-white/20 focus:border-blue-400 focus:ring-2 focus:ring-blue-500 outline-none transition-all duration-300"
+                required
               />
             </div>
 
-            {/* Buttons */}
             <div className="flex gap-4 mt-6">
               <motion.button
                 whileHover={{ scale: 1.05 }}
@@ -151,7 +146,6 @@ const AddTaskModal = ({ onClose, onSuccess }) => {
             </div>
           </form>
 
-          {/* Decorative Glow */}
           <div className="absolute -inset-0.5 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 opacity-30 blur-3xl rounded-2xl -z-10"></div>
         </motion.div>
       </motion.div>

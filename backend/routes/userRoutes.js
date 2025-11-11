@@ -3,31 +3,34 @@ const router = express.Router();
 
 const {
   signup,
-  login,
-  getAllUsers,
-  forgetPassword,
-  resetPassword,
-  updateUser,
   verifyOtp,
+  login,
   resendOtp,
-  resetPasswordForgot
+  forgetPassword,
+  resetPasswordForgot,
+  sendOtpForResetPassword,
+  resetPasswordWithOtp,
+  resetPassword,
+  getAllUsers,
+  updateUser
 } = require('../controllers/userController');
 
 const authMiddleware = require('../middleware/authMiddleware');
 
-// Public routes
-router.post('/', signup);               // Signup
-router.post('/login', login);           // Login
-router.post('/forgot-password', forgetPassword);  // Public
-router.post('/reset-password-forgot', resetPasswordForgot);  // Public
+// === PUBLIC ROUTES (NO AUTH NEEDED) ===
+router.post('/', signup);                       // Step 1: Signup
+router.post('/verify-otp', verifyOtp);          // Step 2: Verify OTP (signup, forgot, settings)
+router.post('/login', login);                   // Step 3: Login (user must be verified)
+router.post('/resend-otp', resendOtp);          // Resend OTP (signup/forgot/settings)
+router.post('/forgot-password', forgetPassword);// Forgot password (sends OTP if user exists)
+router.post('/reset-password-forgot', resetPasswordForgot); // Forgot password reset (email+otp+newPassword)
 
-// OTP verification and resend should be public (no auth required)
-router.post('/verify-otp', verifyOtp);
-router.post('/resend-otp', resendOtp);
+// === PROTECTED ROUTES (AUTH REQUIRED) ===
+router.get('/', authMiddleware, getAllUsers);      // Get all users (dropdown, admin)
+router.patch('/update-profile', authMiddleware, updateUser); // Update name/email
 
-// Protected routes (require auth)
-router.get('/', authMiddleware, getAllUsers);    // Get all users
-router.post('/reset-password', authMiddleware, resetPassword);
-router.patch('/update-profile', authMiddleware, updateUser);
+router.post('/send-otp-reset-password', authMiddleware, sendOtpForResetPassword); // Profile: send OTP for password change
+router.post('/reset-password-with-otp', authMiddleware, resetPasswordWithOtp);    // Profile: reset password with OTP (current+new)
+router.post('/reset-password', authMiddleware, resetPassword);                    // Profile: reset password simple (without OTP, legacy/optional)
 
 module.exports = router;
