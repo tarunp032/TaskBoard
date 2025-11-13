@@ -4,6 +4,34 @@ import TaskCard from "../components/TaskCard";
 import AddTaskModal from "../components/AddTaskModal";
 import EditTaskModal from "../components/EditTaskModal";
 import DeleteConfirm from "../components/DeleteConfirm";
+import CalendarOverlay from "../components/CalendarOverlay";
+// import { DndContext, useDroppable } from "@dnd-kit/core"; 
+// import DraggableTask from "../components/DraggableTask";
+
+// ----- Droppable User Column -----
+// const DroppableUserColumn = ({ user, tasks }) => {
+//   const { isOver, setNodeRef } = useDroppable({
+//     id: user._id,
+//   });
+
+//   const style = {
+//     backgroundColor: isOver ? "#e0d7ff" : undefined,
+//     transition: "background-color 0.3s",
+//   };
+
+//   return (
+//     <div ref={setNodeRef} className="user-task-column" style={style}>
+//       <div className="user-task-col-header">
+//         <div className="user-avatar-board">{user.name.charAt(0).toUpperCase()}</div>
+//         <span className="user-task-board-name">{user.name}</span>
+//         <span className="user-task-board-taskcount">
+//           {tasks.length} {tasks.length === 1 ? "task" : "tasks"}
+//         </span>
+//       </div>
+//       <div className="user-task-cards">{tasks}</div>
+//     </div>
+//   );
+// };
 
 const TasksByMe = () => {
   const [tasks, setTasks] = useState([]);
@@ -14,7 +42,9 @@ const TasksByMe = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState(null);
-  const [expandedTaskId, setExpandedTaskId] = useState(null); // Added
+  const [expandedTaskId, setExpandedTaskId] = useState(null);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [calendarDate, setCalendarDate] = useState(null); // YYYY-MM-DD
 
   // Fetch tasks
   const fetchTasks = async (showLoader = true) => {
@@ -56,9 +86,28 @@ const TasksByMe = () => {
     }
   };
 
+  // // Reassign task API call
+  // const reassignTaskToUser = async (taskId, newUserId) => {
+  //   try {
+  //     await api.patch(`/task/${taskId}/assign`, { assignTo: newUserId });
+  //     alert("Task reassigned!");
+  //     fetchTasks(false);
+  //   } catch (error) {
+  //     alert("Failed to reassign task: " + error.message);
+  //   }
+  // };
+
+  // // DndKit drag end handler
+  // const handleDragEnd = (event) => {
+  //   const { active, over } = event;
+  //   if (over && active.id && over.id && active.id !== over.id) {
+  //     reassignTaskToUser(active.id, over.id);
+  //   }
+  // };
+
   // Filtering & grouping
   const searchTerm = search.trim().toLowerCase();
-  const filteredTasks = tasks.filter(task => {
+  const filteredTasks = tasks.filter((task) => {
     const statusMatch = filterStatus === "all" || task.status === filterStatus;
     const titleMatch = (task.taskname || "").toLowerCase().includes(searchTerm);
     const userMatch = (task.assignTo?.name || "").toLowerCase().includes(searchTerm);
@@ -67,13 +116,28 @@ const TasksByMe = () => {
   });
 
   const groupedTasks = {};
-  filteredTasks.forEach(task => {
+  filteredTasks.forEach((task) => {
     const userId = task.assignTo._id;
     if (!groupedTasks[userId]) {
       groupedTasks[userId] = { user: task.assignTo, tasks: [] };
     }
     groupedTasks[userId].tasks.push(task);
   });
+
+  // --- CALENDAR LOGIC ---
+  const tasksByDate = tasks.reduce((acc, task) => {
+    if (task.deadline) {
+      const d = new Date(task.deadline).toISOString().split("T")[0];
+      if (!acc[d]) acc[d] = [];
+      acc[d].push(task);
+    }
+    return acc;
+  }, {});
+
+  // Calendar handlers
+  const handleCalendarIconClick = () => setShowCalendar(true);
+  const handleDateClick = (dateStr) => setCalendarDate(dateStr);
+  const closeCalendarTaskCard = () => setCalendarDate(null);
 
   if (loading)
     return (
@@ -85,7 +149,6 @@ const TasksByMe = () => {
 
   return (
     <div className="tasks-by-me-container-light">
-      {/* Animated Background */}
       <div className="tasks-by-me-bg-light">
         <div className="gradient-orb-light orb-1-light"></div>
         <div className="gradient-orb-light orb-2-light"></div>
@@ -100,6 +163,22 @@ const TasksByMe = () => {
             <span className="tasks-by-me-title-light">
               Tasks <span className="title-highlight-light">BY Me</span>
             </span>
+            <span
+              className="calendar-icon-light"
+              title="Calendar"
+              style={{
+                marginLeft: "16px",
+                fontSize: "30px",
+                cursor: "pointer",
+                color: "#7b2ff7",
+                background: "#ede9fe",
+                borderRadius: "10px",
+                padding: "8px 11px"
+              }}
+              onClick={handleCalendarIconClick}
+            >
+              📅
+            </span>
           </div>
           <div className="topbar-actions">
             <input
@@ -113,19 +192,14 @@ const TasksByMe = () => {
               onClick={() => setShowAddModal(true)}
               className="add-task-btn-light"
             >
-              <span className="add-icon-light">+</span>
-              Add New Task
+              <span className="add-icon-light">+</span> Add New Task
             </button>
           </div>
         </div>
 
         {/* Filter Buttons */}
         <div className="filter-container-light">
-          {[
-            { label: "All Tasks", value: "all", emoji: "📋" },
-            { label: "Pending", value: "pending", emoji: "⏳" },
-            { label: "Completed", value: "completed", emoji: "✅" },
-          ].map((filter) => (
+          {[{ label: "All Tasks", value: "all", emoji: "📋" }, { label: "Pending", value: "pending", emoji: "⏳" }, { label: "Completed", value: "completed", emoji: "✅" }].map((filter) => (
             <button
               key={filter.value}
               onClick={() => setFilterStatus(filter.value)}
@@ -137,24 +211,20 @@ const TasksByMe = () => {
           ))}
         </div>
 
-        {/* Trello style horizontal user blocks */}
+        {/* User Task Columns (without drag and drop) */}
         <div className="trello-board-container">
           {Object.keys(groupedTasks).length === 0 ? (
             <div className="empty-state-light">
               <div className="empty-icon-light">📭</div>
               <h3 className="empty-title-light">No tasks found</h3>
-              <p className="empty-text-light">
-                Create your first task to get started! ✨
-              </p>
+              <p className="empty-text-light">Create your first task to get started! ✨</p>
             </div>
           ) : (
             <div className="horizontal-user-boards">
               {Object.values(groupedTasks).map((group) => (
                 <div key={group.user._id} className="user-task-column">
                   <div className="user-task-col-header">
-                    <div className="user-avatar-board">
-                      {group.user.name.charAt(0).toUpperCase()}
-                    </div>
+                    <div className="user-avatar-board">{group.user.name.charAt(0).toUpperCase()}</div>
                     <span className="user-task-board-name">{group.user.name}</span>
                     <span className="user-task-board-taskcount">
                       {group.tasks.length} {group.tasks.length === 1 ? "task" : "tasks"}
@@ -162,15 +232,13 @@ const TasksByMe = () => {
                   </div>
                   <div className="user-task-cards">
                     {group.tasks.map((task) => (
-                      <div key={task._id} className="task-accordion">
+                      <div className="task-accordion" key={task._id}>
                         <div
                           className={
                             "task-title-accordion" +
                             (expandedTaskId === task._id ? " task-active" : "")
                           }
-                          onClick={() =>
-                            setExpandedTaskId(expandedTaskId === task._id ? null : task._id)
-                          }
+                          onClick={() => setExpandedTaskId(expandedTaskId === task._id ? null : task._id)}
                         >
                           {task.taskname}
                         </div>
@@ -195,23 +263,14 @@ const TasksByMe = () => {
 
         {/* Refresh Button */}
         <div className="refresh-container-light">
-          <button
-            onClick={() => fetchTasks(true)}
-            className="refresh-btn-light"
-          >
-            <span className="refresh-icon-light">🔄</span>
-            Refresh Tasks
+          <button onClick={() => fetchTasks(true)} className="refresh-btn-light">
+            <span className="refresh-icon-light">🔄</span> Refresh Tasks
           </button>
         </div>
       </div>
 
       {/* Modals */}
-      {showAddModal && (
-        <AddTaskModal
-          onClose={() => setShowAddModal(false)}
-          onSuccess={fetchTasks}
-        />
-      )}
+      {showAddModal && <AddTaskModal onClose={() => setShowAddModal(false)} onSuccess={fetchTasks} />}
       {showEditModal && (
         <EditTaskModal
           taskId={selectedTaskId}
@@ -226,8 +285,83 @@ const TasksByMe = () => {
         />
       )}
 
-      {/* CSS Styles */}
+      {/* Calendar Overlay Modal */}
+      {showCalendar && (
+        <CalendarOverlay
+          open={showCalendar}
+          onClose={() => setShowCalendar(false)}
+          tasksByDate={tasksByDate}
+          onDateClick={handleDateClick}
+        />
+      )}
+
+      {/* TaskCard Modal for selected date */}
+      {calendarDate && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            background: "rgba(0,0,0,0.36)",
+            zIndex: 99999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+          onClick={closeCalendarTaskCard}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: "98vw",
+              background: "#fff",
+              borderRadius: 20,
+              boxShadow: "0 10px 30px #7b2ff742",
+              padding: 24,
+              minWidth: 330,
+            }}
+          >
+            <h3 style={{ fontSize: 24, fontWeight: 700, marginBottom: 12 }}>
+              Tasks on {calendarDate}
+            </h3>
+            {(tasksByDate[calendarDate] || []).length === 0 ? (
+              <>
+                <div>No tasks set for this day.</div>
+                <button
+                  onClick={() => {
+                    setShowAddModal(true);
+                    setShowCalendar(false);
+                    setCalendarDate(null);
+                  }}
+                  className="add-task-btn-light"
+                  style={{ marginTop: 16 }}
+                >
+                  <span className="add-icon-light">+</span> Add New Task
+                </button>
+              </>
+            ) : (
+              (tasksByDate[calendarDate] || []).map((task) => (
+                <TaskCard
+                  key={task._id}
+                  task={task}
+                  from={task.createdBy?.name || "Unknown"}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  isInbox={false}
+                  onParentRefresh={fetchTasks}
+                />
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* -------- All CSS -------- */}
       <style>{`
+      .calendar-icon-light { transition: background 0.2s, box-shadow 0.2s; box-shadow: 0 3px 14px #c4b5fd44; }
+        .calendar-icon-light:hover { background: linear-gradient(135deg, #ede9fe 80%, #f3e8ff 100%); box-shadow: 0 7px 28px #7b2ff726; }
         .tasks-by-me-container-light {
           min-height: 100vh;
           background: #fff;
@@ -382,7 +516,6 @@ const TasksByMe = () => {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
         }
-        /* Trello style user boards */
         .trello-board-container {
           padding: 10px 0;
         }
@@ -391,7 +524,7 @@ const TasksByMe = () => {
           gap: 28px;
           overflow-x: auto;
           padding-bottom: 24px;
-          align-items: flex-start; /* Fix: columns grow independently */
+          align-items: flex-start;
         }
         .user-task-column {
           min-width: 310px;
@@ -403,6 +536,7 @@ const TasksByMe = () => {
           display: flex;
           flex-direction: column;
           gap: 14px;
+          transition: background-color 0.3s;
         }
         .user-task-col-header {
           display: flex;
@@ -421,6 +555,7 @@ const TasksByMe = () => {
           justify-content: center;
           font-size: 20px;
           font-weight: 700;
+          user-select: none;
         }
         .user-task-board-name {
           font-size: 18px;
@@ -439,7 +574,6 @@ const TasksByMe = () => {
           flex-direction: column;
           gap: 12px;
         }
-        /* Accordion task UI */
         .task-accordion {
           margin-bottom: 8px;
           background: none;

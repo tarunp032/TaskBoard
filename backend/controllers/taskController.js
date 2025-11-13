@@ -2,7 +2,7 @@ const Task = require('../models/taskModel');
 const User = require("../models/userModel");
 const sendEmail = require("../utils/sendEmail");
 
-// Create Task
+//1. Create Task
 exports.createTask = async (req, res) => {
   try {
     const { taskname, assignTo, deadline } = req.body;
@@ -38,7 +38,7 @@ exports.createTask = async (req, res) => {
   }
 };
 
-// Get Tasks TO Me
+//2. Get Tasks TO Me
 exports.getTasksToMe = async (req, res) => {
   try {
     const { startDate, endDate, status } = req.query;
@@ -75,7 +75,7 @@ exports.getTasksToMe = async (req, res) => {
   }
 };
 
-// Get Tasks BY Me
+//3. Get Tasks BY Me
 exports.getTasksByMe = async (req, res) => {
   try {
     const { startDate, endDate, status } = req.query;
@@ -111,7 +111,7 @@ exports.getTasksByMe = async (req, res) => {
   }
 };
 
-// Update Task Status
+//4. Update Task Status
 exports.updateTaskStatus = async (req, res) => {
   try {
     const { taskId } = req.params;
@@ -149,7 +149,7 @@ exports.updateTaskStatus = async (req, res) => {
   }
 };
 
-// Update Task (Edit)
+//5. Update Task (Edit)
 exports.updateTask = async (req, res) => {
   try {
     const { taskId } = req.params;
@@ -192,7 +192,7 @@ exports.updateTask = async (req, res) => {
   }
 };
 
-// Delete Task
+//6. Delete Task
 exports.deleteTask = async (req, res) => {
   try {
     const { taskId } = req.params;
@@ -219,7 +219,7 @@ exports.deleteTask = async (req, res) => {
   }
 };
 
-// Get Dashboard Stats
+//7. Get Dashboard Stats
 exports.getDashboardStats = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -257,6 +257,60 @@ exports.getDashboardStats = async (req, res) => {
     });
   } catch (error) {
     console.error('Get dashboard stats error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+//8. Reassign a task to a new user
+exports.reassignTask = async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const { assignTo } = req.body;
+    const userId = req.user._id;
+
+    if (!assignTo) {
+      return res.status(400).json({ success: false, message: "assignTo is required" });
+    }
+
+    // Find the task and populate required fields
+    const task = await Task.findById(taskId).populate("assignBy", "name email").populate("assignTo", "name email");
+    if (!task) {
+      return res.status(404).json({ success: false, message: "Task not found" });
+    }
+
+    // Only the assignBy (creator) can reassign (you may relax this if you want)
+    if (task.assignBy._id.toString() !== userId.toString()) {
+      return res.status(403).json({ success: false, message: "Only task creator can reassign" });
+    }
+
+    // Prevent assigning to self
+    if (assignTo === userId.toString()) {
+      return res.status(403).json({ success: false, message: "Cannot assign task to yourself" });
+    }
+
+    // Fetch new user data
+    const newUser = await User.findById(assignTo);
+    if (!newUser) {
+      return res.status(404).json({ success: false, message: "Assignee user not found" });
+    }
+
+    // Update task's assignTo field
+    task.assignTo = newUser._id;
+    task.status = "pending"; 
+    await task.save();
+    await task.populate("assignTo", "name email");
+    await task.populate("assignBy", "name email");
+
+    // Send email to new assignee
+    await sendEmail({
+      to: newUser.email,
+      subject: `You got a new Task: ${task.taskname}`,
+      text: `Hello ${newUser.name},\n\nYou have been assigned a new task by ${task.assignBy.name}.\n\nTask: ${task.taskname}\nDeadline: ${task.deadline}\n\nPlease check your dashboard for details.\n\n(Task was reassigned to you.)`
+    });
+
+    res.json({ success: true, message: "Task reassigned successfully", data: task });
+  } catch (error) {
+    console.error("Reassign task error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };

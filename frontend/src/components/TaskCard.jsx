@@ -7,7 +7,7 @@ import SubTaskModal from "./SubTaskModal";
 
 const TaskCard = ({
   task,
-  from, // <-- now "from" is passed in
+  from,
   onStatusToggle,
   onEdit,
   onDelete,
