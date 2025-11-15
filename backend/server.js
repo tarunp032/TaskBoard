@@ -7,8 +7,13 @@ const app = express();
 
 // Middleware
 app.use(express.json());
+
+const allowedOrigins = [
+  'https://taskboard-frontend-qyst.onrender.com',
+  'http://localhost:5173'
+];
 app.use(cors({
-  origin: 'http://localhost:5173',
+  origin: allowedOrigins,
   credentials: true
 }));
 
